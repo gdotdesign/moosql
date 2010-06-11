@@ -2,6 +2,7 @@ MooSql
 ===========
 
 Class wrapper for HTML5 SQL Storage
+
 More information on HTML5 SQL Storage http://dev.w3.org/html5/webdatabase/
 
 How to use
