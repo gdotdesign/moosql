@@ -8,7 +8,7 @@ How to use
 ----------
 
         //Create an instance.
-	var sqlDB = new MooSQL({
+        var sqlDB = new MooSQL({
             //Database name
             dbName:'Test',
             //Database version (max 4 numbers seperated by dots)
@@ -32,7 +32,11 @@ Events
 ----------
 
 databaseReady - fires when the database is ready for work.
+
 databaseCreated - fires when the database created if there is none.
+
 notSupported - fires if the browser not supports SQL storage
+
 transactionError - fires if something goes wrong with the transation, 1 argument(SQLException)
+
 statmentError - fires if the statement is invalid , 1 argument(SQLException)
