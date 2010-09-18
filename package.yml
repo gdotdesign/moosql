@@ -2,4 +2,5 @@ name: MooSQL
 author: gdotdesign
 category: Utilities
 tags: [storage]
-#current: 0.1
+demo: http://gdotdesign.github.com/moosql/
+current: 0.9
