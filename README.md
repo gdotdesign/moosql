@@ -41,3 +41,9 @@ notSupported - fires if the browser not supports SQL storage
 transactionError - fires if something goes wrong with the transation, 1 argument(SQLException)
 
 statmentError - fires if the statement is invalid , 1 argument(SQLException)
+
+Changelog
+----------
+Added helper functions (find,remove,save,insert etc).
+
+The source is now in CoffeScript.
