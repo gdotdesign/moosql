@@ -149,12 +149,12 @@ MooSQL = new Class {
   # * **what**: Columns for selecting.
   # * **where**: Key, value pair specifing the arguments for the WHERE clause.
   # * **callback**: The callback function.
-  find: (table, what, Where, callback) ->
+  find: (table, Where, callback) ->
     if Where is null
       wheremap = ''
     else
       wheremap = @whereMap Where
-    @exec "SELECT "+$splat(what).join(',')+" FROM '#{table}' "+(if Where is null? then ';' else "WHERE #{wheremap};"), callback
+    @exec "SELECT * FROM '#{table}' "+(if Where is null? then ';' else "WHERE #{wheremap};"), callback
   # ##tableExists
   # Checks for a table with the given name.
   # If there isn't an error the table exists.
