@@ -1,94 +1,28 @@
-# MooSql
-# ===========
-# 
-# Class wrapper for HTML5 SQL Storage
-# 
-# More information on HTML5 SQL Storage http://dev.w3.org/html5/webdatabase/
-# 
-# How to use
-# ----------
-# 
-#         //Create an instance.
-#         var sqlDB = new MooSQL({
-#             //Database name
-#             dbName:'Test',
-#             //Database version (max 4 numbers seperated by dots)
-#             dbVersion:'1.0',
-#             //Database description (officially database display name)
-#             dbDesc:'This is a test Database',
-#             //Estimated size
-#             dbSize:20*100
-#         })
-#         sqlDB.addEvent('databaseReady',function(){
-#             //Execute some SQL statement, callback is needed
-#             sqlDB.exec("SELECT * FROM 'sometable'",callback.bindWithEvent());
-#         })
-#        
-#         //Callback function
-#         function callback(transaction,result){
-#            log(result.rows.item(0));
-#         }
-# 
-# Events
-# ----------
-# 
-# databaseReady - fires when the database is ready for work.
-# 
-# databaseCreated - fires when the database created if there is none.
-# 
-# notSupported - fires if the browser not supports SQL storage
-# 
-# transactionError - fires if something goes wrong with the transation, 1 argument(SQLException)
-# 
-# statmentError - fires if the statement is invalid , 1 argument(SQLException)
-
-# ##Options
-# * **dbName**: Database name.
-# * **dbVersion**: DaDatabase version (max 4 numbers seperated by dots).
-# * **dbDesc**: Database description (officially database display name).
-# * **dbSize**: Estimated size.
-MooSQL = new Class {
+MooSQL = new Class.Singleton {
   Implements : [Options, Events]
-  options: {
-    dbName: ''
-    dbVersion:''
-    dbDesc:''
-    dbSize:20*100
-  }
-  # ##Constructor
-  initialize: (options) ->
-    # Set options.
-    @setOptions options
-    # Check for sqllite database support.
+  initialize: () ->
+    
+  connect: (db) ->
+    #@setOptions options
     if window.openDatabase isnt null
-      # Open the database.
       @db = window.openDatabase(
-        @options.dbName
-        @options.dbVersion
-        @options.dbDesc
-        @options.dbSize
-        # Callback for database creation.
+        db
+        ''
+        ''
+        ''
         ( (db) ->
           @db = db
           @fireEvent 'databaseCreated'
         ).bind @
       )
-    # If there is a database fire the ready event.
     if @db isnt null
       @fireEvent 'databaseReady'
     else
       @fireEvent 'notSupported'
-    # Return "this".
     @
-  # ##exec
-  # Basic sql statement execution function (asynchronous).
-  # ###Arguments:
-  # 
-  # * **statement**: A valid SQL statement.
-  # * **callback**:  Runs either when the transtaction successfull, when there is a statement error
-  #   or when is a transation error.
-  # * **args**: Addition arguments.
+
   exec: (statement, callback, args) ->
+    console.log statement
     @db.transaction ((tr) ->
       tr.executeSql(
         statement
@@ -105,26 +39,14 @@ MooSQL = new Class {
        @fireEvent('transactionError', err)
        false
        ).bind @
-  # ##like
-  # Runs a select statement with LIKE.
-  # ###Arguments:
-  # 
-  # * **table**: The name of the table.
-  # * **what**: Columns for selecting.
-  # * **where**: Key, value pair specifing the arguments for the WHERE clause .
-  # * **callback**: The callback function.
+ 
   like: (table, what, Where, callback) ->
     if Where is null
       wheremap = ''
     else
       wheremap = @likeMap Where
     @exec "SELECT "+$splat(what).join(',')+" FROM '#{table}' "+(if Where is null? then ';' else "WHERE #{wheremap};"), callback
-  # ##findAll
-  # Selects everything from the specified tables.
-  # ###Arguments:
-  # 
-  # * **tables**: The name of the tables.
-  # * **callback**: The callback function.
+ 
   findAll: (tables, callback) ->
     query = ''
     $splat(tables).each (item,i) ->
@@ -133,57 +55,27 @@ MooSQL = new Class {
       else
         query +="union SELECT *, '#{item}' AS type FROM '#{item}' "
     @exec "#{query};", callback
-  # ##findA
-  # Selects everything from a table.
-  # ###Arguments:
-  # 
-  # * **table**: The name of the table.
-  # * **callback**: The callback function.
+
   findA: (table,callback) ->
     @exec "SELECT * FROM '"+table+"';", callback
-  # ##find
-  # Runs a SELECT query.
-  # ###Arguments:
-  # 
-  # * **table**: The name of the table.
-  # * **what**: Columns for selecting.
-  # * **where**: Key, value pair specifing the arguments for the WHERE clause.
-  # * **callback**: The callback function.
+
   find: (table, Where, callback) ->
     if Where is null
       wheremap = ''
     else
       wheremap = @whereMap Where
     @exec "SELECT * FROM '#{table}' "+(if Where is null? then ';' else "WHERE #{wheremap};"), callback
-  # ##tableExists
-  # Checks for a table with the given name.
-  # If there isn't an error the table exists.
-  # ###Arguments:
-  # 
-  # * **table**: The name of the table.
-  # * **callback**: The callback function.
+
   tableExists: (name,callback) ->
     @exec "select * from #{name}",callback
-  # ##create
-  # Creates a table.
-  # ###Arguments:
-  # 
-  # * **table**: The name of the table.
-  # * **callback**: The callback function.
+
   create: (table, values, callback) ->
     valuesmap = new Hash(values).map((value,key) ->
       '"'+key+'" '+$splat(value).join(" ").toUpperCase()
     )
     values = $splat(valuesmap.getValues()).join ', '
     @exec "CREATE TABLE '#{table}' ( #{values} )", callback
-  # ##save
-  # Saves a record in a table. If there isn't a record inserts it.
-  # ###Arguments:
-  # 
-  # * **table**: The name of the table.
-  # * **set**: Key value pairs for the SET.
-  # * **where**: Key, value pairs specifing the arguments for the WHERE clause.
-  # * **callback**: The callback function
+
   save: (table, set, Where, callback) ->
     @find table, '*', Where, ( (tr, result) ->
       if result.rows.length > 0
@@ -191,60 +83,136 @@ MooSQL = new Class {
       else
         @insert table, $extend(set,Where), callback
       ).bindWithEvent @
-  # ##insert
-  # Inserts a record in a table.
-  # ###Arguments:
-  # 
-  # * **table**: The name of the table.
-  # * **values**: Key, value pairs.
-  # * **callback**: The callback function
+ 
   insert: (table, values, callback) ->
     vals = new Hash values
     valuesa = vals.getValues().map (item) ->
-      "'#{item}'"
+      if item?
+        "'#{item}'"
+      else
+        "NULL"
     keys = vals.getKeys().map (item) ->
       "'#{item}'"
     @exec "INSERT INTO '#{table}' ( #{keys} ) VALUES ( #{valuesa} );", callback
-  # ##remove
-  # Removes a record from a table.
-  # ###Arguments:
-  # 
-  # * **table**: The name of the table.
-  # * **where**: Key, value pairs specifing the arguments for the WHERE clause.
-  # * **callback**: The callback function
+ 
   remove: (table, Where, callback) ->
     wheremap =  @whereMap Where
     @exec "DELETE FROM '#{table}' WHERE #{wheremap};", callback
-  # ##update
-  # Updates a record in a table.
-  # ###Arguments:
-  # 
-  # * **table**: The name of the table.
-  # * **set**: Key value pairs for the SET.
-  # * **where**: Key, value pairs specifing the arguments for the WHERE clause.
-  # * **callback**: The callback function
+ 
   update: (table, set, Where, callback) ->
     wheremap =  @whereMap Where
     setmap = $splat(new Hash(set).map((value,key) ->
       "#{key}='#{value}'"
     ).getValues()).join ', '
     @exec "UPDATE '#{table}' SET #{setmap} WHERE #{wheremap};", callback
-  # ##whereMap
-  # Generates "key='value' AND key='value' AND..." map of objects
-  # ###Arguments:
-  # 
-  # * **wher**: Key, value pairs. 
+ 
   whereMap: (wher) ->
     $splat(new Hash(wher).map((value,key) ->
       key+"='"+value+"'"
     ).getValues()).join " AND "
-  # ##likeMap
-  # Generates "key LIKE 'value' AND key LIKE 'value' AND..." map of objects
-  # ###Arguments:
-  # 
-  # * **wher**: Key, value pairs.
+ 
   likeMap: (wher) ->
     $splat(new Hash(wher).map((value,key) ->
       key+" LIKE '"+value+"'"
     ).getValues()).join " AND "
+}
+MooSQL.Resource = new Class {
+  Implements : [Options, Events]
+  table: null
+  properties: {}
+  initialize: () ->
+    console.log @table
+    MooSQL.tableExists @table, ( ->
+      if arguments[1].code?
+        if arguments[1].code == 5
+          createmap = new Hash(@properties).map (value,key) ->
+            ret = value.type
+            if value.key?
+              ret += ' PRIMARY KEY'
+            else if value.unqiue?
+              ret += ' UNIQUE'
+            if value.default?
+              ret += " DEFAULT '#{value.default}'"
+            ret 
+          MooSQL.create @table, createmap, ->
+    ).bind @
+  create: (properties) ->
+    record = new MooSQL.Resource.Record(@properties,@table)
+    record.save properties
+  new: ->
+    new MooSQL.Resource.Record(@properties,@table)
+  first: (properites) ->
+  find: () ->
+  parseProperties: ->
+    @properties.each (item,i) ->
+      
+}
+MooSQL.Resource.Properties = new Class {
+  Implements : [Options, Events]
+  initialize: (properties) ->
+    @props = properties
+    @
+  getClean: ->
+    (new Hash(@props).map (value,key) ->
+      if value.default?
+        value.default
+      else
+        null
+    ).getClean()
+  setValues: (values) ->
+    @values = $merge @getValues(), values
+  getValues: ->
+    @values
+  merge: (props) ->
+    if @values?
+      $merge @getValues(), props
+    else
+      $merge @getClean(), props
+}
+MooSQL.Resource.Record = new Class {
+  Implements : [Options, Events]
+  initialize: (properites,table) ->
+    @properties = new MooSQL.Resource.Properties(properites)
+    @table = table
+    @
+  save: (properties) ->
+    props = @properties.merge properties
+    MooSQL.insert @table, props, ( (tr,result) ->
+      if result.rowsAffected is 0
+        #throw error
+      else
+        @getROWID result.insertId
+    ).bind @
+    @
+  getROWID: (id) ->
+    MooSQL.find @table, {ROWID:id}, ( (tr,result) ->
+      if result.rows.length > 0
+        @properties.setValues result.rows.item(0)
+      else
+        #throw error
+    ).bind @
+  get: (properties) ->
+    MooSQL.find @table, @properties.merge( properties ), ( (tr,result) ->
+      if result.rows.length > 0
+        @properties.setValues result.rows.item(0)
+      else
+        #throw error
+    ).bind @
+  update: (properties) ->
+    MooSQL.update @table, properties, @properties.getValues(), ( (tr,result) ->
+      console.log arguments
+      if result.rowsAffected > 0
+        @properties.setValues properties
+      else
+        #throw error
+    ).bind @
+    @
+  destroy: ->
+    MooSQL.remove @table, @properties.getValues(), ( (tr,result) ->
+      if result.rowsAffected > 0
+        #deleted
+      else
+        #throw error
+    ).bind @
+    @
 }

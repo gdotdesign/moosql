@@ -1,17 +1,4 @@
-###
-SERIAL = Integer with auto increment
-
-###
-MooSQL = new Class.Singleton {
-  Implements : [Options, Events]
-  options: {
-    dbName: ''
-    dbVersion:''
-    dbDesc:''
-    dbSize:20*100
-  } 
-}
-MooSQL.connect('INK');
+MooSQL.connect 'moosql'
 
 User = new Class{
   Extends: MooSQL.Resource

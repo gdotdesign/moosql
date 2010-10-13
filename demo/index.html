@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+    <title>GDotUI.Demo</title>
+    <script type="text/javascript" src="mootools-1.2.4-core.js"></script>
+    <script type="text/javascript" src="singleton.js"></script>
+    <script type="text/javascript" src="../builds/moosql-latest.js"></script>
+    <script>
+        window.addEvent('domready',function(){
+         MooSQL.connect('moosql');
+         User = new Class.Singleton({
+            Extends: MooSQL.Resource,
+            table: 'user',
+            properties: {
+              id: {type: 'INTEGER', key: true },
+              name: {type: 'TEXT', default: 'me'}
+            }
+          })
+          a = User.create({name:'Gutty'})
+        })
+    </script>
+</head>
