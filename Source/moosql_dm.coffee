@@ -11,6 +11,11 @@ User = new Class{
 
 #User.autoUpdate()
 
-User.create {
+u = User.create {
   name: 'gdotdesign'
 }
+u = User.first {
+  name: 'gdotdesign'
+}
+u.addEvent 'ready', ->
+  console.log 'Record ready'

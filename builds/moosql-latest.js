@@ -110,12 +110,41 @@ MooSQL = new Class.Singleton({
     }).getValues()).join(" AND ");
   }
 });
+MooSQL.Properties = new Class({
+  setValues: function(values) {
+    this.values = $merge(this.getClean(), values);
+    return (this.dirty = true);
+  },
+  getValues: function() {
+    return this.values;
+  },
+  getClean: function() {
+    return (new Hash(this.properties).map(function(value, key) {
+      var _a;
+      return (typeof (_a = value["default"]) !== "undefined" && _a !== null) ? value["default"] : null;
+    })).getClean();
+  },
+  merge: function(props) {
+    var _a;
+    return (typeof (_a = this.values) !== "undefined" && _a !== null) ? $merge(this.values, props) : $merge(this.getClean(), props);
+  },
+  set: function(key, value) {
+    var _a;
+    if (typeof (_a = this.properties[key]) !== "undefined" && _a !== null) {
+      this.values[key] = value;
+      return (this.dirty = true);
+    }
+  },
+  get: function(key) {
+    var _a;
+    return (typeof (_a = this.properties[key]) !== "undefined" && _a !== null) ? this.values[key] : null;
+  }
+});
 MooSQL.Resource = new Class({
-  Implements: [Options, Events],
+  Implements: [Events, MooSQL.Properties],
   table: null,
   properties: {},
   initialize: function() {
-    console.log(this.table);
     return MooSQL.tableExists(this.table, (function() {
       var _a, createmap;
       if (typeof (_a = arguments[1].code) !== "undefined" && _a !== null) {
@@ -146,51 +175,56 @@ MooSQL.Resource = new Class({
   "new": function() {
     return new MooSQL.Resource.Record(this.properties, this.table);
   },
-  first: function(properites) {},
-  find: function() {},
+  first: function(properties) {
+    var record;
+    record = this["new"](this.properties, this.table);
+    MooSQL.find(this.table, $merge(properties), function(tr, result) {
+      return result.rowsAffected > 0 ? record.setValues(result.rows.item(0)) : null;
+    });
+    return record;
+  },
+  find: function(properties) {
+    var ret;
+    ret = new MooSQL.Resource.RecordCollection(this.properites, this.table);
+    MooSQL.find(this.table, $merge(properties), (function(tr, result) {
+      var _a, i;
+      if (result.rowsAffected > 0) {
+        ret.setValues(properties);
+        if (result.rows.length > 0) {
+          i = 0;
+          _a = [];
+          while (i < result.rows.length) {
+            _a.push((function() {
+              ret.addRecord(result.rows.item(i));
+              return i++;
+            })());
+          }
+          return _a;
+        }
+      }
+    }).bind(this));
+    return ret;
+  },
   parseProperties: function() {
     return this.properties.each(function(item, i) {});
   }
 });
-MooSQL.Resource.Properties = new Class({
-  Implements: [Options, Events],
-  initialize: function(properties) {
-    this.props = properties;
-    return this;
-  },
-  getClean: function() {
-    return (new Hash(this.props).map(function(value, key) {
-      var _a;
-      return (typeof (_a = value["default"]) !== "undefined" && _a !== null) ? value["default"] : null;
-    })).getClean();
-  },
-  setValues: function(values) {
-    return (this.values = $merge(this.getValues(), values));
-  },
-  getValues: function() {
-    return this.values;
-  },
-  merge: function(props) {
-    var _a;
-    return (typeof (_a = this.values) !== "undefined" && _a !== null) ? $merge(this.getValues(), props) : $merge(this.getClean(), props);
-  }
-});
 MooSQL.Resource.Record = new Class({
-  Implements: [Options, Events],
-  initialize: function(properites, table) {
-    this.properties = new MooSQL.Resource.Properties(properites);
+  Implements: [Events, MooSQL.Properties],
+  initialize: function(properties, table) {
+    this.dirty = false;
+    this.saved = false;
+    this.properties = properties;
     this.table = table;
     return this;
   },
   save: function(properties) {
     var props;
-    props = this.properties.merge(properties);
+    if (typeof properties !== "undefined" && properties !== null) {
+      props = this.merge(properties);
+    }
     MooSQL.insert(this.table, props, (function(tr, result) {
-      if (result.rowsAffected === 0) {
-
-      } else {
-        return this.getROWID(result.insertId);
-      }
+      return result.rowsAffected === 0 ? this.fireEvent('saveFailed', result.message) : this.getROWID(result.insertId);
     }).bind(this));
     return this;
   },
@@ -199,40 +233,63 @@ MooSQL.Resource.Record = new Class({
       ROWID: id
     }, (function(tr, result) {
       if (result.rows.length > 0) {
-        return this.properties.setValues(result.rows.item(0));
+        this.setValues(result.rows.item(0));
+        this.dirty = false;
+        return this.fireEvent('ready');
       } else {
-
-      }
-    }).bind(this));
-  },
-  get: function(properties) {
-    return MooSQL.find(this.table, this.properties.merge(properties), (function(tr, result) {
-      if (result.rows.length > 0) {
-        return this.properties.setValues(result.rows.item(0));
-      } else {
-
+        return this.fireEvent('fetchFailed', result.message);
       }
     }).bind(this));
   },
   update: function(properties) {
-    MooSQL.update(this.table, properties, this.properties.getValues(), (function(tr, result) {
-      console.log(arguments);
-      if (result.rowsAffected > 0) {
-        return this.properties.setValues(properties);
+    MooSQL.update(this.table, properties, this.getValues(), (function(tr, result) {
+      var _a;
+      if (typeof (_a = result.rowsAffected) !== "undefined" && _a !== null) {
+        this.setValues(properties);
+        this.dirty = false;
+        return this.fireEvent('updated');
       } else {
-
+        return this.fireEvent('updateFailed', result.message);
       }
     }).bind(this));
     return this;
   },
   destroy: function() {
-    MooSQL.remove(this.table, this.properties.getValues(), (function(tr, result) {
-      if (result.rowsAffected > 0) {
-
-      } else {
-
-      }
+    MooSQL.remove(this.table, this.getValues(), (function(tr, result) {
+      return !(result.rowsAffected > 0) ? this.fireEvent('destroyFailed', result.message) : null;
     }).bind(this));
     return this;
+  }
+});
+MooSQL.Resource.RecordCollection = new Class({
+  Implements: [Events, MooSQL.Properties],
+  initialize: function(properties, table) {
+    this.dirty = false;
+    this.saved = false;
+    this.properties = properties;
+    this.table = table;
+    this.records = [];
+    return this;
+  },
+  addRecord: function(props) {
+    var record;
+    record = new MooSQL.Resource.Record(this.properties, this.table);
+    record.setValues(props);
+    return this.records.push(record);
+  },
+  save: function(properties) {
+    return this.reecords.each(function(record) {
+      return record.update(properties);
+    });
+  },
+  update: function(properties) {
+    return this.records.each(function(record) {
+      return record.update(properties);
+    });
+  },
+  destroy: function() {
+    return this.records.each(function(record) {
+      return record.destroy();
+    });
   }
 });

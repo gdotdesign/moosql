@@ -4,3 +4,9 @@ category: Utilities
 tags: [storage]
 docs: http://gdotdesign.github.com/moosql/
 current: 0.9
+sources:
+  - Source/MooSQL.coffee
+  - Source/Resource/Properties.coffee
+  - Source/Resource/Resource.coffee
+  - Source/Resource/Record.coffee
+  - Source/Resource/RecordCollection.coffee

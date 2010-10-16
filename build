@@ -1,0 +1,3 @@
+#!/bin/bash
+packager build MooSQL/* > builds/moosql-latest.coffee
+coffee --print --no-wrap builds/moosql-latest.coffee > builds/moosql-latest.js

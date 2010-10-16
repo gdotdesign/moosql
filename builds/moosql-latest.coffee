@@ -116,12 +116,45 @@ MooSQL = new Class.Singleton {
       key+" LIKE '"+value+"'"
     ).getValues()).join " AND "
 }
+
+
+
+MooSQL.Properties = new Class {
+  setValues: (values) ->
+    @values = $merge @getClean(), values
+    @dirty = yes
+  getValues: ->
+    @values
+  getClean: ->
+    (new Hash(@properties).map (value,key) ->
+      if value.default?
+        value.default
+      else
+        null
+    ).getClean()
+  merge: (props) ->
+    if @values?
+      $merge @values, props
+    else
+      $merge @getClean(), props
+  
+  #set property
+  set: (key,value) ->
+    if @properties[key]?
+     	@values[key] = value
+     	@dirty = yes  
+  get: (key) ->
+    if @properties[key]?
+      @values[key] 
+}
+
+
 MooSQL.Resource = new Class {
-  Implements : [Options, Events]
+  Implements : [Events
+                MooSQL.Properties]
   table: null
   properties: {}
   initialize: () ->
-    console.log @table
     MooSQL.tableExists @table, ( ->
       if arguments[1].code?
         if arguments[1].code == 5
@@ -141,45 +174,46 @@ MooSQL.Resource = new Class {
     record.save properties
   new: ->
     new MooSQL.Resource.Record(@properties,@table)
-  first: (properites) ->
-  find: () ->
+  first: (properties) ->
+    record = @new @properties, @table
+    MooSQL.find @table, $merge(properties), (tr,result) ->
+      if result.rowsAffected > 0
+        record.setValues result.rows.item(0)
+    record
+  find: (properties) ->
+    ret = new MooSQL.Resource.RecordCollection  @properites, @table
+    MooSQL.find @table, $merge(properties), ( (tr,result) ->
+      if result.rowsAffected > 0
+        ret.setValues properties
+        if result.rows.length > 0
+          i = 0    
+          while i < result.rows.length
+            ret.addRecord result.rows.item(i)
+            i++
+    ).bind @
+    ret
   parseProperties: ->
     @properties.each (item,i) ->
       
 }
-MooSQL.Resource.Properties = new Class {
-  Implements : [Options, Events]
-  initialize: (properties) ->
-    @props = properties
-    @
-  getClean: ->
-    (new Hash(@props).map (value,key) ->
-      if value.default?
-        value.default
-      else
-        null
-    ).getClean()
-  setValues: (values) ->
-    @values = $merge @getValues(), values
-  getValues: ->
-    @values
-  merge: (props) ->
-    if @values?
-      $merge @getValues(), props
-    else
-      $merge @getClean(), props
-}
+
+
 MooSQL.Resource.Record = new Class {
-  Implements : [Options, Events]
-  initialize: (properites,table) ->
-    @properties = new MooSQL.Resource.Properties(properites)
+  Implements : [Events
+                MooSQL.Properties]
+  initialize: (properties,table) ->
+    @dirty = no
+    @saved = no
+    @properties = properties
     @table = table
     @
+
   save: (properties) ->
-    props = @properties.merge properties
+    if properties?
+      props = @merge properties
     MooSQL.insert @table, props, ( (tr,result) ->
       if result.rowsAffected is 0
-        #throw error
+        @fireEvent 'saveFailed', result.message 
       else
         @getROWID result.insertId
     ).bind @
@@ -187,32 +221,54 @@ MooSQL.Resource.Record = new Class {
   getROWID: (id) ->
     MooSQL.find @table, {ROWID:id}, ( (tr,result) ->
       if result.rows.length > 0
-        @properties.setValues result.rows.item(0)
+        @setValues result.rows.item(0)
+        @dirty = no
+        @fireEvent 'ready'
       else
-        #throw error
-    ).bind @
-  get: (properties) ->
-    MooSQL.find @table, @properties.merge( properties ), ( (tr,result) ->
-      if result.rows.length > 0
-        @properties.setValues result.rows.item(0)
-      else
-        #throw error
+        @fireEvent 'fetchFailed', result.message
     ).bind @
   update: (properties) ->
-    MooSQL.update @table, properties, @properties.getValues(), ( (tr,result) ->
-      console.log arguments
-      if result.rowsAffected > 0
-        @properties.setValues properties
+    MooSQL.update @table, properties, @getValues(), ( (tr,result) ->
+      if result.rowsAffected?
+        @setValues properties
+        @dirty = no
+        @fireEvent 'updated'
       else
-        #throw error
+        @fireEvent 'updateFailed', result.message
     ).bind @
     @
   destroy: ->
-    MooSQL.remove @table, @properties.getValues(), ( (tr,result) ->
-      if result.rowsAffected > 0
-        #deleted
-      else
-        #throw error
+    MooSQL.remove @table, @getValues(), ( (tr,result) ->
+      if not (result.rowsAffected > 0)
+        @fireEvent 'destroyFailed', result.message
     ).bind @
     @
 }
+
+
+MooSQL.Resource.RecordCollection = new Class {
+  Implements : [Events
+                MooSQL.Properties]
+  initialize: (properties,table) ->
+    @dirty = no
+    @saved = no
+    @properties = properties
+    @table = table
+    @records = []
+    @
+  addRecord: (props) ->
+    record = new MooSQL.Resource.Record @properties, @table
+    record.setValues props
+    @records.push record
+    #record.addEvent ''            
+  save: (properties) ->
+    @reecords.each (record) ->
+      record.update properties
+  update: (properties) ->
+    @records.each (record) ->
+      record.update properties
+  destroy: ->          
+    @records.each (record) ->
+      record.destroy()
+}
+
