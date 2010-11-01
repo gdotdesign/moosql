@@ -60,11 +60,12 @@ MooSQL = new Class.Singleton {
     @exec "SELECT * FROM '"+table+"';", callback
 
   find: (table, Where, callback) ->
+    console.log Where
     if Where is null
       wheremap = ''
     else
       wheremap = @whereMap Where
-    @exec "SELECT * FROM '#{table}' "+(if Where is null? then ';' else "WHERE #{wheremap};"), callback
+    @exec "SELECT *, ROWID FROM '#{table}' "+(if Where is null then ';' else "WHERE #{wheremap};"), callback
 
   tableExists: (name,callback) ->
     @exec "select * from #{name}",callback
@@ -107,8 +108,13 @@ MooSQL = new Class.Singleton {
     @exec "UPDATE '#{table}' SET #{setmap} WHERE #{wheremap};", callback
  
   whereMap: (wher) ->
-    $splat(new Hash(wher).map((value,key) ->
-      key+"='"+value+"'"
+    $splat(new Hash(wher).filter((value,key) ->
+      if value?
+        true
+      else
+        false
+    ).map((value,key) ->
+        key+"='"+value+"'"
     ).getValues()).join " AND "
  
   likeMap: (wher) ->

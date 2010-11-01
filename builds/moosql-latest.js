@@ -52,12 +52,13 @@ MooSQL = new Class.Singleton({
   },
   find: function(table, Where, callback) {
     var wheremap;
+    console.log(Where);
     if (Where === null) {
       wheremap = '';
     } else {
       wheremap = this.whereMap(Where);
     }
-    return this.exec(("SELECT * FROM '" + (table) + "' ") + (Where === (typeof null !== "undefined" && null !== null) ? ';' : ("WHERE " + (wheremap) + ";")), callback);
+    return this.exec(("SELECT *, ROWID FROM '" + (table) + "' ") + (Where === null ? ';' : ("WHERE " + (wheremap) + ";")), callback);
   },
   tableExists: function(name, callback) {
     return this.exec("select * from " + (name), callback);
@@ -100,7 +101,9 @@ MooSQL = new Class.Singleton({
     return this.exec("UPDATE '" + (table) + "' SET " + (setmap) + " WHERE " + (wheremap) + ";", callback);
   },
   whereMap: function(wher) {
-    return $splat(new Hash(wher).map(function(value, key) {
+    return $splat(new Hash(wher).filter(function(value, key) {
+      return (typeof value !== "undefined" && value !== null) ? true : false;
+    }).map(function(value, key) {
       return key + "='" + value + "'";
     }).getValues()).join(" AND ");
   },
@@ -162,8 +165,12 @@ MooSQL.Resource = new Class({
             }
             return ret;
           });
-          return MooSQL.create(this.table, createmap, function() {});
+          return MooSQL.create(this.table, createmap, (function() {
+            return this.fireEvent('created');
+          }).bind(this));
         }
+      } else {
+        return this.fireEvent('ready');
       }
     }).bind(this));
   },
@@ -176,37 +183,43 @@ MooSQL.Resource = new Class({
     return new MooSQL.Resource.Record(this.properties, this.table);
   },
   first: function(properties) {
-    var record;
+    var props, record;
+    if (typeof properties !== "undefined" && properties !== null) {
+      props = this.merge(properties);
+    } else {
+      props = null;
+    }
     record = this["new"](this.properties, this.table);
-    MooSQL.find(this.table, $merge(properties), function(tr, result) {
-      return result.rowsAffected > 0 ? record.setValues(result.rows.item(0)) : null;
+    MooSQL.find(this.table, props, function(tr, result) {
+      if (result.rows.length > 0) {
+        record.setValues(result.rows.item(0));
+        console.log(result.rows.item(0), 'first');
+      }
+      return record.fireEvent('ready');
     });
     return record;
   },
   find: function(properties) {
-    var ret;
-    ret = new MooSQL.Resource.RecordCollection(this.properites, this.table);
-    MooSQL.find(this.table, $merge(properties), (function(tr, result) {
-      var _a, i;
-      if (result.rowsAffected > 0) {
-        ret.setValues(properties);
-        if (result.rows.length > 0) {
-          i = 0;
-          _a = [];
-          while (i < result.rows.length) {
-            _a.push((function() {
-              ret.addRecord(result.rows.item(i));
-              return i++;
-            })());
-          }
-          return _a;
+    var props, ret;
+    if (typeof properties !== "undefined" && properties !== null) {
+      props = this.merge(properties);
+    } else {
+      props = null;
+    }
+    ret = new MooSQL.Resource.RecordCollection(this.properties, this.table);
+    MooSQL.find(this.table, props, (function(tr, result) {
+      var i;
+      ret.setValues(properties);
+      if (result.rows.length > 0) {
+        i = 0;
+        while (i < result.rows.length) {
+          ret.addRecord(result.rows.item(i));
+          i++;
         }
       }
+      return ret.fireEvent('ready');
     }).bind(this));
     return ret;
-  },
-  parseProperties: function() {
-    return this.properties.each(function(item, i) {});
   }
 });
 MooSQL.Resource.Record = new Class({

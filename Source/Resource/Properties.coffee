@@ -25,4 +25,6 @@ MooSQL.Properties = new Class {
   get: (key) ->
     if @properties[key]?
       @values[key] 
+    else
+      null
 }
